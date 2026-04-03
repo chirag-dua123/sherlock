@@ -116,6 +116,27 @@ $ echo '{"usernames":["user123"]}' | apify call -so netmilk/sherlock
 
 Read more about the [Sherlock Actor](../.actor/README.md), including how to use it programmatically via the Apify [API](https://apify.com/netmilk/sherlock/api?fpr=sherlock), [CLI](https://docs.apify.com/cli/?fpr=sherlock) and [JS/TS and Python SDKs](https://docs.apify.com/sdk?fpr=sherlock).
 
+## How It Works
+
+Sherlock searches for a given username across 400+ social networks in a few steps:
+
+1. **Site data** — A [data.json](../sherlock_project/resources/data.json) manifest lists every supported site along with the URL pattern for a user profile (e.g. `https://github.com/{}`), and the *detection method* to use for that site.
+
+2. **Concurrent requests** — Sherlock fires off all HTTP requests simultaneously using a thread-pool-backed `FuturesSession`.  This keeps the total runtime low even when checking hundreds of sites.
+
+3. **Username detection** — Each site entry declares one or more of three detection strategies:
+   | Strategy | How it works |
+   | --- | --- |
+   | `status_code` | A **2xx** response means the profile exists; any other status means it doesn't. |
+   | `message` | The response body is scanned for a known error string (e.g. *"User not found"*). If the string is absent the account is considered found. |
+   | `response_url` | Sherlock disables redirects. A **2xx** on the original URL means the profile exists; a redirect to a different URL means it doesn't. |
+
+4. **Username validation** — Sites can define a `regexCheck` pattern. If the requested username doesn't match that pattern the site is skipped immediately (marked `ILLEGAL`) without making a network request.
+
+5. **WAF / bot-detection handling** — Known fingerprints of Cloudflare, AWS WAF, and similar systems are matched against the response body. Blocked requests are marked `WAF` so they don't show up as false positives.
+
+6. **Output** — Claimed accounts are printed to the terminal in real time. Results are also saved to a text file named after the username. Optional `--csv` and `--xlsx` flags produce spreadsheet-friendly exports.
+
 ## Credits
 
 Thank you to everyone who has contributed to Sherlock! ❤️
